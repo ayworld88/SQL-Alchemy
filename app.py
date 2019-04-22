@@ -1,0 +1,77 @@
+import sqlalchemy
+import numpy as np
+import datetime as dt
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func, desc, distinct
+from flask import Flask, jsonify
+
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+Base = automap_base()
+Base.prepare(engine, reflect=True)
+Measurement = Base.classes.measurement
+Station = Base.classes.station
+
+session = Session(engine)
+
+app = Flask(__name__)
+@app.route("/")
+def welcome():
+    """List all available routes."""
+    return (
+        f"Available Routes:<br/>"
+        f"/api/precipitation<br/>"
+        f"/api/stations<br/>"
+        f"/api/temperature<br/>"
+        f"/api/<start><br/>"
+        f"/api/<start>/<end>"
+    )
+
+@app.route("/api/precipitation")
+def precipitation():
+    """All the precipitation values"""
+    result = session.query(Measurement.date, Measurement.prcp).\
+        filter(Measurement.date > "2016-08-23").all()
+    all_dates = []
+    for date, prcp in result:
+        prcp_dict = {}
+        prcp_dict["date"] = date
+        prcp_dict["prcp"] = prcp
+        all_dates.append(prcp_dict)
+
+    return jsonify(all_dates)
+
+@app.route("/api/stations")
+def stations():
+    """Stations"""
+    result = session.query(Station.name).all()
+    all_stations = list(np.ravel(result))
+    return jsonify(all_stations)
+
+@app.route("/api/temperature")
+def temperature():
+    """Temperature observations for the previous year"""
+    result = session.query(Measurement.date, Measurement.tobs).\
+        filter(Measurement.date > "2016-08-23").all()
+    all_temp = []
+    for date, tobs in result:
+        temp_dict = {}
+        temp_dict["date"] = date
+        temp_dict["temperature"] = tobs
+        all_temp.append(temp_dict)
+    return jsonify(all_temp)
+
+@app.route("/api/<start>/<end>")
+def api(start, end=0):
+    """"Minimum, Average and Maximum temperatureS"""
+
+    result = session.query(func.min(Measurement.tobs),\
+         func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+        filter(Measurement.date >= start).\
+        filter(Measurement.date <= end).all()
+    all_result = list(np.ravel(result))
+    return jsonify(all_result)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
